@@ -1,12 +1,18 @@
 # shared/ : logique commune en Kotlin Multiplatform
 
-Tout ce que les deux applications ont en commun vit ici, et y est testé une seule fois. Construit par Gradle. Les règles communes du dépôt sont dans `AGENTS.md`, à la racine.
+Tout ce que les deux applications ont en commun vit ici, et y est testé une seule fois. Construit par Gradle, qui le publie pour les deux applications : un AAR par module pour Android, le framework `Shared` pour iOS. Les règles communes du dépôt sont dans `AGENTS.md`, à la racine.
 
 ## Modules
 
 - `core/<nom>` : brique commune (session, réseau, modèle). Plugin `kmp.core`.
 - `feature/<nom>` : logique d'un écran ou d'un parcours. Plugin `kmp.feature`, qui ajoute le `ViewModel` multiplateforme d'AndroidX.
 - `umbrella` : le seul module qui produit le framework iOS `Shared`. Plugin `kmp.umbrella`. `SharedGraph` y assemble les dépendances à la main, en attendant le choix d'une bibliothèque d'injection.
+
+## Ce qu'Android voit
+
+- Chaque module est publié en AAR, avec la variante Android de son code, par `tools/shared/sync --android`. L'application Android en dépend à travers `//android/shared`.
+- Une dépendance ajoutée à un `build.gradle.kts` se reporte dans les `deps` du `shared_aar` du module, dans `android/shared/BUILD.bazel` : un AAR ne déclare pas ses dépendances à Bazel.
+- Après un changement, relancer `tools/shared/sync --android` puis `bazel test //android/...`.
 
 ## Écrire la logique d'une feature
 

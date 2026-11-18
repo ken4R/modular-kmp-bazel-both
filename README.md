@@ -1,8 +1,8 @@
-# modular-kmp-bazel
+# modular-kmp-bazel-both
 
 Projet mobile modulaire, iOS et Android : la logique est écrite une seule fois en Kotlin Multiplatform, l'interface reste native sur chaque plateforme (SwiftUI et Jetpack Compose).
 
-Ce dépôt porte le prototype de la solution A, dite hybride : Gradle construit le code partagé et l'application Android, Bazel construit l'application iOS.
+Ce dépôt porte le prototype de la solution B : Gradle construit le code partagé et le publie en binaires, un AAR par module pour Android et un XCFramework pour iOS. Bazel construit les deux applications et leurs modules. Il reprend tel quel le code du [prototype A](https://github.com/ken4R/modular-kmp-bazel), où Gradle construit aussi l'application Android : seuls les fichiers de build changent.
 
 ## Ce que le prototype contient
 
@@ -12,40 +12,46 @@ Une feature de référence, `login`, traverse toutes les couches :
 |---|---|---|
 | Logique partagée | `shared/feature/login` | `LoginViewModel`, son état, ses événements, ses tests |
 | Brique commune | `shared/core/session` | Session de l'utilisateur, derrière une interface |
+| Pont vers Android | `android/shared` | Un AAR par module partagé, publié par Gradle, importé par Bazel |
 | Pont vers iOS | `shared/umbrella` | Framework `Shared`, traduit pour Swift par SKIE |
-| Android | `android/feature/login`, `android/app` | Écran Compose, test d'écran, application |
-| iOS | `ios/Features/Login`, `ios/App` | Vue SwiftUI, tests, application |
+| Android | `android/feature/login`, `android/app` | Écran Compose, tests d'écran, application, construits par Bazel |
+| iOS | `ios/Features/Login`, `ios/App` | Vue SwiftUI, tests, application, construits par Bazel |
 
-Chaque module iOS est construit par Bazel et reste un paquet Swift : son `Package.swift` est généré depuis son `BUILD.bazel`.
+Gradle et Bazel lisent le même catalogue de versions, `gradle/libs.versions.toml`. Les dépendances Maven de Bazel y sont prises et verrouillées dans `maven_install.json`.
 
 ## Démarrer
 
-Outils : JDK 21, le SDK Android, et sur macOS Xcode 26.4 et [Bazelisk](https://github.com/bazelbuild/bazelisk).
+Outils : JDK 21, [Bazelisk](https://github.com/bazelbuild/bazelisk), le SDK Android avec la plateforme 37, et sur macOS Xcode 26.4.
 
-Android et code partagé, sur Linux ou macOS :
+Code partagé et Android, sur Linux ou macOS :
 
 ```sh
-./gradlew check                       # tests, lint, règles de dépendance
-./gradlew :android:app:assembleDebug  # l'application Android
+./gradlew check                 # tests du code partagé, règles de dépendance
+tools/shared/sync --android     # publie les AAR du code partagé pour Bazel
+bazel build //android/app       # l'application : bazel-bin/android/app/app.apk
+bazel test //android/...        # tests d'écran Robolectric
 ```
 
 iOS, sur macOS :
 
 ```sh
-tools/shared/sync          # construit Shared.xcframework depuis le code Kotlin
+tools/shared/sync --ios    # construit Shared.xcframework depuis le code Kotlin
 bazel test //ios/...       # construit l'application iOS et lance ses tests
 bazel run //ios:xcodeproj  # génère ios/Modular.xcodeproj
 ```
+
+Sur macOS, `tools/shared/sync` sans option prépare les deux applications.
 
 Dans l'application, n'importe quelle adresse e-mail se connecte avec le mot de passe `kotlin`.
 
 ## Organisation
 
 ```
-shared/        logique commune, Kotlin Multiplatform (Gradle)
-android/       application et écrans Compose (Gradle)
+shared/        logique commune, Kotlin Multiplatform (Gradle, publiée en AAR et en XCFramework)
+android/       application et écrans Compose, AAR du code partagé (Bazel)
 ios/           application et vues SwiftUI, un paquet Swift par module (Bazel)
-build-logic/   plugins de convention Gradle, règles de dépendance entre modules
+build-logic/   plugins de convention Gradle, règles de dépendance du code partagé
+gradle/        catalogue de versions, lu par Gradle et par Bazel
 tools/         scripts du dépôt
 ```
 
@@ -53,7 +59,7 @@ Les règles du dépôt, les types de modules et la marche à suivre pour ajouter
 
 ## Intégration continue
 
-La CI GitHub Actions lance les contrôles Gradle sur Linux, puis sur macOS le framework partagé, le build et les tests iOS avec Bazel, et le build d'un module comme paquet Swift. Voir [.github/workflows/ci.yml](.github/workflows/ci.yml).
+La CI GitHub Actions lance sur Linux les contrôles Gradle du code partagé, publie ses AAR, puis construit et teste l'application Android avec Bazel ; l'APK de debug est gardé comme artefact. Sur macOS, elle construit le framework partagé, puis l'application iOS et ses tests avec Bazel, et un module comme paquet Swift. Voir [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## Valeurs provisoires
 

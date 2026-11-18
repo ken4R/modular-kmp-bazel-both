@@ -11,7 +11,7 @@ Interface iOS en SwiftUI, construite par Bazel. Chaque module est aussi un paque
 
 ## Avant de construire
 
-`ios/SharedKit/Frameworks/Shared.xcframework` vient du code Kotlin et n'est pas versionné. `tools/shared/sync` le construit. Sans lui, Bazel s'arrête et rappelle la commande.
+`ios/SharedKit/Frameworks/Shared.xcframework` vient du code Kotlin et n'est pas versionné. `tools/shared/sync --ios` le construit, et `tools/shared/sync` aussi, avec les AAR d'Android. Sans lui, Bazel s'arrête et rappelle la commande.
 
 ## Déclarer un module
 
