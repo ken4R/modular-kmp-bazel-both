@@ -13,12 +13,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gradle:
-    name: Shared code and Android (Gradle)
+  android:
+    name: Shared code (Gradle) and Android (Bazel)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
+    # Temporary, until maven_install.json is committed: the job commits the lock file it writes.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The branch itself rather than the merge commit, so that the lock file can be pushed to it.
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - uses: actions/setup-java@v6
         with:
@@ -29,12 +35,50 @@ jobs:
         with:
           cache-provider: basic
 
+      - uses: bazel-contrib/setup-bazel@0.19.2
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-android
+          repository-cache: true
+
       - name: Test the build logic and the module rules
         run: ./gradlew -p build-logic test
 
-      # check: shared tests on the JVM, Compose screen tests, lint, module rules.
-      - name: Check every module and build the Android application
-        run: ./gradlew check :android:app:assembleDebug
+      # check: shared tests on the JVM, module rules.
+      - name: Check the shared code
+        run: ./gradlew check
+
+      - name: Publish the shared code for Bazel
+        run: tools/shared/sync --android
+
+      # Temporary, until maven_install.json is committed: lock the Maven dependencies of Bazel,
+      # and commit the lock file to the branch of the pull request.
+      - name: Lock the Maven dependencies of Bazel
+        if: github.event_name == 'pull_request'
+        run: |
+          REPIN=1 bazel run @maven//:pin
+          if ! git diff --quiet -- maven_install.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add maven_install.json
+            git commit -m "Verrouille les dépendances Maven de Bazel"
+            git push origin "HEAD:refs/heads/${GITHUB_HEAD_REF}"
+          fi
+
+      # The Android SDK of the runner has the platform and the build tools of compileSdk 37.
+      - name: Build the Android application with Bazel
+        run: bazel build //android/app
+
+      # Robolectric screen tests, and every other Android target.
+      - name: Test Android with Bazel
+        run: bazel test //android/...
+
+      - name: Keep the debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: modular-debug-apk
+          path: bazel-bin/android/app/app.apk
+          if-no-files-found: error
 
   ios:
     name: iOS (Gradle framework, Bazel, Swift packages)
@@ -65,14 +109,14 @@ jobs:
       - uses: bazel-contrib/setup-bazel@0.19.2
         with:
           bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
+          disk-cache: ${{ github.workflow }}-ios
           repository-cache: true
 
       - name: Test the shared code on an iOS simulator
         run: ./gradlew iosSimulatorArm64Test
 
       - name: Build Shared.xcframework
-        run: tools/shared/sync
+        run: tools/shared/sync --ios
 
       # The Bazel test runner reuses one simulator, named after its device type and iOS version,
       # and creates it with this same tool when it is missing. Its first boot takes minutes on a
