@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#
+# Builds Shared.xcframework from the Kotlin sources and puts it where the iOS build expects it:
+# ios/SharedKit/Frameworks/Shared.xcframework. Bazel and the Swift packages both read it there.
+#
+#   tools/shared/sync             debug framework, the default
+#   tools/shared/sync --release   release framework
+#
+# Run it after every change under shared/. Gradle skips the work that is already done.
+
+set -euo pipefail
+
+configuration="Debug"
+case "${1:-}" in
+  "" | --debug) ;;
+  --release) configuration="Release" ;;
+  *)
+    echo "usage: tools/shared/sync [--debug | --release]" >&2
+    exit 64
+    ;;
+esac
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "tools/shared/sync needs macOS: Kotlin/Native builds the iOS framework with Xcode." >&2
+  exit 1
+fi
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+variant="$(printf '%s' "$configuration" | tr '[:upper:]' '[:lower:]')"
+built="$root/shared/umbrella/build/XCFrameworks/$variant/Shared.xcframework"
+destination="$root/ios/SharedKit/Frameworks/Shared.xcframework"
+
+"$root/gradlew" --project-dir "$root" ":shared:umbrella:assembleShared${configuration}XCFramework"
+
+rm -rf "$destination"
+mkdir -p "$(dirname "$destination")"
+cp -R "$built" "$destination"
+
+echo "Shared.xcframework ($variant) is in ios/SharedKit/Frameworks."

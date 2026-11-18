@@ -1,0 +1,17 @@
+"""Bazel builds the iOS application and its modules. Everything else belongs to Gradle."""
+
+module(name = "modular_kmp_bazel")
+
+# apple_support comes first: its C++ toolchain must be registered before the one of rules_cc.
+bazel_dep(name = "apple_support", version = "2.12.0")
+bazel_dep(name = "rules_apple", version = "5.4.0")
+bazel_dep(name = "rules_swift", version = "4.3.0")
+
+# Constraint values, such as @platforms//os:ios.
+bazel_dep(name = "platforms", version = "1.0.0")
+
+# Writes the generated Package.swift files back to the source tree and tests that they are current.
+bazel_dep(name = "bazel_lib", version = "3.8.0")
+
+# Generates the Xcode project: bazel run //ios:xcodeproj
+bazel_dep(name = "rules_xcodeproj", version = "4.1.0")

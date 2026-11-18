@@ -1,0 +1,8 @@
+# Bazel builds the iOS side only. Gradle builds the shared Kotlin code and Android: see AGENTS.md.
+
+# Show why an action failed, and the log of a failing test, without another run.
+build --verbose_failures
+test --test_output=errors
+
+# Local settings that must not be committed.
+try-import %workspace%/.bazelrc.user

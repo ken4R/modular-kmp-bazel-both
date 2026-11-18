@@ -1,0 +1,27 @@
+# Gradle and Kotlin
+.gradle/
+.kotlin/
+build/
+local.properties
+
+# Bazel
+/bazel-*
+.bazelrc.user
+
+# Shared framework: built by tools/shared/sync, never committed
+/ios/SharedKit/Frameworks/
+
+# Xcode and SwiftPM
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+.swiftpm/
+.build/
+Package.resolved
+
+# Editors and system
+.idea/
+*.iml
+.vscode/
+.DS_Store

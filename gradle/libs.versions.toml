@@ -1,0 +1,56 @@
+# Single source of truth for the Gradle side. Kotlin, SKIE, AGP and Gradle move together:
+# check the Kotlin Multiplatform compatibility guide before changing any of them.
+# https://kotlinlang.org/docs/multiplatform/multiplatform-compatibility-guide.html
+
+[versions]
+# Toolchain
+kotlin = "2.4.21"
+agp = "9.3.1"
+skie = "0.10.16"
+
+# Android SDK levels. minSdk is a prototype default: the real value is an open decision.
+# compileSdk follows the AndroidX libraries: Compose 1.12 and Lifecycle 2.11 require 37.
+# targetSdk changes runtime behavior, so it moves on its own, and Robolectric must support it.
+android-compileSdk = "37"
+android-targetSdk = "36"
+android-minSdk = "26"
+
+# Libraries
+kotlinx-coroutines = "1.11.0"
+androidx-lifecycle = "2.11.0"
+androidx-activity = "1.13.0"
+androidx-compose-bom = "2026.09.00"
+
+# Tests
+junit = "4.13.2"
+robolectric = "4.18"
+androidx-test-ext-junit = "1.3.0"
+
+[libraries]
+# Shared code
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+androidx-lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel", version.ref = "androidx-lifecycle" }
+
+# Android UI
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "androidx-compose-bom" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui" }
+androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+
+# Android tests
+junit = { module = "junit:junit", version.ref = "junit" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext-junit" }
+
+# Gradle plugins, as libraries: build-logic is the only place that applies them.
+android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
+skie-gradle-plugin = { module = "co.touchlab.skie:gradle-plugin", version.ref = "skie" }
