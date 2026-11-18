@@ -33,7 +33,8 @@ android_module(
 - Sources dans `src/main/kotlin/`, ressources dans `src/main/res/`, tests dans `src/test/kotlin/`. Chaque fichier `*Test.kt` devient une cible de test du même nom.
 - La macro ajoute Compose, son compilateur, et pour une feature ce qu'il faut pour observer un ViewModel partagé. Une autre bibliothèque doit figurer dans `[libraries]` du catalogue, puis s'écrit `@maven//:<groupe>_<artefact>`, points et tirets remplacés par `_`.
 - Une feature n'est visible que de `//android/app`. L'AAR d'une feature partagée n'est visible que de sa feature Android et de l'application, l'umbrella que de l'application : Bazel refuse le reste.
-- Quand un module de `shared/` gagne une dépendance dans son `build.gradle.kts`, la reporter dans les `deps` de son `shared_aar` : un AAR ne déclare pas ses dépendances à Bazel.
+- Quand un module de `shared/` gagne une dépendance dans son `build.gradle.kts`, la reporter dans les `deps` de son `shared_aar` : un AAR ne déclare pas ses dépendances à Bazel. `shared_aar` ajoute lui-même ce qu'ajoutent les plugins de convention : Kotlin, les coroutines et, pour une feature, le ViewModel.
+- Dans les `deps` d'un `shared_aar`, une bibliothèque Kotlin Multiplatform s'écrit avec l'artefact qui porte ses classes Android : `_android` pour la plupart des bibliothèques AndroidX, comme `@maven//:androidx_lifecycle_lifecycle_viewmodel_android`, `_jvm` pour celles de kotlinx. Bazel vérifie que chaque classe utilisée par un AAR vient d'une dépendance directe, et l'artefact racine d'une telle bibliothèque n'en contient aucune.
 
 ## Écrire un écran
 
@@ -49,6 +50,15 @@ Le modèle est `feature/login`.
 - Tests d'écran sur JVM, avec Robolectric et `createComposeRule()`, dans `src/test`. Voir `LoginScreenTest`, et `LoginRouteTest`, qui pilote le vrai ViewModel partagé chargé depuis son AAR.
 - `bazel test //android/feature/login:all`, ou `bazel test //android/...` pour tout.
 - Robolectric tourne hors ligne, avec le runtime Android du `targetSdk`, épinglé dans le catalogue (`robolectric-android-all`). Un test qui demande un autre niveau de SDK, par `@Config(sdk = ...)`, ne trouve pas son runtime.
+
+## Versions des bibliothèques Maven
+
+Bazel résout les `[libraries]` du catalogue à partir des fichiers POM, comme Maven. Gradle lit les métadonnées de module Gradle, et les deux ne choisissent pas toujours les mêmes versions. L'écart ne casse pas forcément le build : il peut n'apparaître qu'à l'exécution, par une classe ou une méthode absente.
+
+- Deux bibliothèques d'un même groupe AndroidX à des versions différentes, ou une bibliothèque qui reçoit une version plus ancienne que celle qu'elle demande : la fixer dans la section « Bazel only » de `[libraries]`, à la version que Gradle choisit, puis lancer `REPIN=1 bazel run @maven//:pin`.
+- Une bibliothèque Kotlin Multiplatform dont le POM racine désigne l'artefact JVM au lieu de l'artefact Android : la rediriger vers l'artefact Android par `maven.override` dans `MODULE.bazel`, comme `androidx.window:window-core`.
+
+Après un changement de version dans le catalogue, en particulier du BOM Compose, ces versions sont à vérifier de nouveau : rien ne le fait automatiquement.
 
 ## Différences avec le build Gradle du prototype A
 

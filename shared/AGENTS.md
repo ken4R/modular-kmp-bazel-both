@@ -11,7 +11,7 @@ Tout ce que les deux applications ont en commun vit ici, et y est testé une seu
 ## Ce qu'Android voit
 
 - Chaque module est publié en AAR, avec la variante Android de son code, par `tools/shared/sync --android`. L'application Android en dépend à travers `//android/shared`.
-- Une dépendance ajoutée à un `build.gradle.kts` se reporte dans les `deps` du `shared_aar` du module, dans `android/shared/BUILD.bazel` : un AAR ne déclare pas ses dépendances à Bazel.
+- Une dépendance ajoutée à un `build.gradle.kts` se reporte dans les `deps` du `shared_aar` du module, dans `android/shared/BUILD.bazel` : un AAR ne déclare pas ses dépendances à Bazel. `android/AGENTS.md` dit sous quel nom.
 - Après un changement, relancer `tools/shared/sync --android` puis `bazel test //android/...`.
 
 ## Écrire la logique d'une feature

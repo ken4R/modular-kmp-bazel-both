@@ -60,6 +60,20 @@ maven.from_toml(
     bom_modules = ["androidx.compose:compose-bom"],
     libs_versions_toml = "//gradle:libs.versions.toml",
 )
+
+# The root artifact of a Kotlin Multiplatform library names a single platform in its POM, which Bazel
+# reads, and every platform in its Gradle module metadata, which Gradle reads. The POMs of these two
+# name their JVM artifact where Gradle takes the Android one: the application would get JVM classes,
+# twice for runtime-annotation, whose Android artifact comes through another library. Both are
+# replaced by their Android artifact.
+maven.override(
+    coordinates = "androidx.compose.runtime:runtime-annotation",
+    target = "@maven//:androidx_compose_runtime_runtime_annotation_android",
+)
+maven.override(
+    coordinates = "androidx.window:window-core",
+    target = "@maven//:androidx_window_window_core_android",
+)
 use_repo(maven, "maven")
 
 # Android SDK levels and the Robolectric runtime, read from the same catalog.
