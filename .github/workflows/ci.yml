@@ -80,6 +80,66 @@ jobs:
           path: bazel-bin/android/app/app.apk
           if-no-files-found: error
 
+      # Temporary probe: the versions Gradle selects for the Android dependencies of the catalog,
+      # with Gradle module metadata, to compare with the Maven resolution of Bazel. Last, so that
+      # its output ends the log.
+      - name: Resolve the Android dependencies with Gradle (temporary probe)
+        if: always()
+        continue-on-error: true
+        run: |
+          probe="$RUNNER_TEMP/android-probe"
+          mkdir -p "$probe"
+          echo "android.useAndroidX=true" > "$probe/gradle.properties"
+          cat > "$probe/settings.gradle.kts" <<EOF
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement {
+              repositories { google(); mavenCentral() }
+              versionCatalogs { create("libs") { from(files("$GITHUB_WORKSPACE/gradle/libs.versions.toml")) } }
+          }
+          rootProject.name = "android-probe"
+          EOF
+          cat > "$probe/build.gradle.kts" <<'EOF'
+          import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+
+          plugins { id("com.android.library") version "9.3.1" }
+
+          android {
+              namespace = "com.example.probe"
+              compileSdk = 37
+              defaultConfig { minSdk = 26 }
+          }
+
+          val catalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
+          fun library(alias: String) = catalog.findLibrary(alias).get()
+
+          dependencies {
+              implementation(platform(library("androidx-compose-bom")))
+              listOf(
+                  "kotlin-stdlib", "kotlinx-coroutines-core", "kotlinx-coroutines-android",
+                  "androidx-lifecycle-viewmodel", "androidx-lifecycle-runtime-compose",
+                  "androidx-lifecycle-viewmodel-compose", "androidx-activity-compose",
+                  "androidx-compose-ui", "androidx-compose-ui-tooling-preview", "androidx-compose-material3",
+                  "guava-listenablefuture",
+              ).forEach { implementation(library(it)) }
+              listOf(
+                  "androidx-compose-ui-test-junit4", "androidx-compose-ui-test-manifest",
+                  "androidx-test-ext-junit", "junit", "robolectric",
+              ).forEach { testImplementation(library(it)) }
+          }
+
+          tasks.register("printResolved") {
+              val result = configurations.named("debugUnitTestRuntimeClasspath").map { it.incoming.resolutionResult }
+              doLast {
+                  result.get().allComponents
+                      .mapNotNull { it.id as? ModuleComponentIdentifier }
+                      .map { "${it.group}:${it.module}:${it.version}" }
+                      .sorted()
+                      .forEach { println("resolved $it") }
+              }
+          }
+          EOF
+          ./gradlew -p "$probe" --quiet --no-configuration-cache printResolved
+
   ios:
     name: iOS (Gradle framework, Bazel, Swift packages)
     runs-on: macos-26
