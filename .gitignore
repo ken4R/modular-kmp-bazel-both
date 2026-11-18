@@ -8,7 +8,8 @@ local.properties
 /bazel-*
 .bazelrc.user
 
-# Shared framework: built by tools/shared/sync, never committed
+# Shared code published for Bazel by tools/shared/sync, never committed
+/android/shared/maven/
 /ios/SharedKit/Frameworks/
 
 # Xcode and SwiftPM

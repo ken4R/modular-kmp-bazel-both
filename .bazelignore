@@ -1,6 +1,5 @@
 .gradle
 .kotlin
-android
 build
 build-logic
 shared

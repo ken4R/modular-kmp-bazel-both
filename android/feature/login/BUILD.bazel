@@ -1,0 +1,14 @@
+load("//android:android_module.bzl", "android_module")
+
+# The Compose screens of the login feature. Its logic is the shared feature, imported as an AAR.
+android_module(
+    name = "login",
+    test_deps = [
+        # LoginRouteTest drives the screen with the real shared ViewModel.
+        "//android/shared:core_session",
+    ],
+    deps = [
+        "//android/core/designsystem",
+        "//android/shared:feature_login",
+    ],
+)

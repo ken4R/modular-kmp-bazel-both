@@ -12,13 +12,20 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
  *
  * Targets: Android and iOS (device and Apple silicon simulator).
  * Tests: `commonTest` runs on the JVM with `./gradlew :<module>:testAndroidHostTest`.
+ * Bazel builds the applications: the Android library of every shared module is published for it
+ * with `./gradlew publishAndroidForBazel`, which tools/shared/sync runs.
  */
 class KmpCorePlugin : Plugin<Project> {
 
     override fun apply(target: Project) {
         with(target) {
+            // Coordinates of the published library, set before the Kotlin plugin creates its publications.
+            group = moduleGroup
+            version = SHARED_VERSION
+
             pluginManager.apply("org.jetbrains.kotlin.multiplatform")
             pluginManager.apply("com.android.kotlin.multiplatform.library")
+            pluginManager.apply("maven-publish")
 
             extensions.configure(KotlinMultiplatformExtension::class.java) {
                 // Every declaration states its visibility: what is `public` here is what Swift and Compose see.
@@ -50,6 +57,7 @@ class KmpCorePlugin : Plugin<Project> {
                 }
             }
 
+            registerBazelPublication()
             registerModuleRulesCheck()
         }
     }

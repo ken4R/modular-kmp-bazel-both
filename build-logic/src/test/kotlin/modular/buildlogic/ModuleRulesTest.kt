@@ -20,58 +20,26 @@ class ModuleRulesTest {
     }
 
     @Test
-    fun sharedCodeMustNotDependOnAndroidModules() {
-        assertViolation(":shared:core:session", ":android:core:designsystem")
-        assertViolation(":shared:feature:login", ":android:core:designsystem")
-    }
-
-    @Test
     fun sharedCoreMustNotDependOnAFeature() {
         assertViolation(":shared:core:session", ":shared:feature:login")
     }
 
     @Test
-    fun androidFeatureMayDependOnItsOwnSharedFeatureAndOnCores() {
-        assertNoViolation(
-            ":android:feature:login",
-            ":shared:feature:login",
-            ":shared:core:session",
-            ":android:core:designsystem",
-        )
+    fun sharedCodeMustNotDependOnTheUmbrella() {
+        assertViolation(":shared:core:session", ":shared:umbrella")
+        assertViolation(":shared:feature:login", ":shared:umbrella")
     }
 
     @Test
-    fun androidFeatureMustNotDependOnAnotherFeature() {
-        assertViolation(":android:feature:login", ":shared:feature:profile")
-        assertViolation(":android:feature:login", ":android:feature:profile")
-    }
-
-    @Test
-    fun androidFeatureMustNotDependOnTheUmbrella() {
-        assertViolation(":android:feature:login", ":shared:umbrella")
-    }
-
-    @Test
-    fun umbrellaMayDependOnSharedModulesOnly() {
+    fun umbrellaMayDependOnSharedModules() {
         assertNoViolation(":shared:umbrella", ":shared:feature:login", ":shared:core:session")
-        assertViolation(":shared:umbrella", ":android:core:designsystem")
-    }
-
-    @Test
-    fun applicationMayDependOnEverything() {
-        assertNoViolation(
-            ":android:app",
-            ":shared:umbrella",
-            ":shared:feature:login",
-            ":android:feature:login",
-            ":android:core:designsystem",
-        )
     }
 
     @Test
     fun moduleAtAnUnknownLocationIsRejected() {
         assertEquals(1, ModuleRules.violations(":shared:login", emptyList()).size)
-        assertViolation(":android:app", ":misc:utils")
+        assertEquals(1, ModuleRules.violations(":android:app", emptyList()).size)
+        assertViolation(":shared:umbrella", ":misc:utils")
     }
 
     @Test

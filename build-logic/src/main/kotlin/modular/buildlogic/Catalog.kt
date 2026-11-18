@@ -25,9 +25,18 @@ internal fun VersionCatalog.intVersion(alias: String): Int =
 
 /**
  * Android namespace of a module, derived from its Gradle path so that it never has to be written:
- * `:shared:feature:login` gives `com.example.modular.shared.feature.login`,
- * `:android:feature:login` gives `com.example.modular.feature.login`.
+ * `:shared:feature:login` gives `com.example.modular.shared.feature.login`.
+ * Bazel imports the module under the same name: see android/shared/BUILD.bazel.
  */
 internal val Project.moduleNamespace: String
-    get() = (listOf(BASE_PACKAGE) + path.split(':').filter { it.isNotEmpty() && it != "android" })
-        .joinToString(".")
+    get() = (listOf(BASE_PACKAGE) + pathSegments).joinToString(".")
+
+/**
+ * Maven group of a module: its namespace without its own name.
+ * `:shared:feature:login` is published as `com.example.modular.shared.feature:login-android`.
+ */
+internal val Project.moduleGroup: String
+    get() = (listOf(BASE_PACKAGE) + pathSegments.dropLast(1)).joinToString(".")
+
+private val Project.pathSegments: List<String>
+    get() = path.split(':').filter { it.isNotEmpty() }

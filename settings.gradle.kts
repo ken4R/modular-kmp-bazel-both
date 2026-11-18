@@ -27,14 +27,10 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "modular-kmp-bazel"
+rootProject.name = "modular-kmp-bazel-both"
 
 // Shared code (Kotlin Multiplatform). A feature never depends on another feature.
+// Gradle builds nothing else: Bazel builds the Android and iOS applications from what it publishes.
 include(":shared:core:session")
 include(":shared:feature:login")
 include(":shared:umbrella")
-
-// Android application (Compose).
-include(":android:app")
-include(":android:core:designsystem")
-include(":android:feature:login")

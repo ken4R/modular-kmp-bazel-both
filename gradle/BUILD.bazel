@@ -1,0 +1,3 @@
+# The version catalog is read by Bazel too: MODULE.bazel imports its libraries, and
+# //android:catalog.bzl its Android SDK levels.
+exports_files(["libs.versions.toml"])
