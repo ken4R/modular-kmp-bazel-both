@@ -55,7 +55,7 @@ Le modèle est `feature/login`.
 
 Bazel résout les `[libraries]` du catalogue à partir des fichiers POM, comme Maven. Gradle lit les métadonnées de module Gradle, et les deux ne choisissent pas toujours les mêmes versions. L'écart ne casse pas forcément le build : il peut n'apparaître qu'à l'exécution, par une classe ou une méthode absente.
 
-- Deux bibliothèques d'un même groupe AndroidX à des versions différentes, ou une bibliothèque qui reçoit une version plus ancienne que celle qu'elle demande : la fixer dans la section « Bazel only » de `[libraries]`, à la version que Gradle choisit, puis lancer `REPIN=1 bazel run @maven//:pin`.
+- Deux bibliothèques d'un même groupe AndroidX à des versions différentes, ou une bibliothèque qui reçoit une version plus ancienne que celle qu'elle demande : la fixer dans la section « Bazel only » de `[libraries]`, à la version que Gradle choisit, puis lancer `REPIN=1 bazel run @maven//:pin`. Une bibliothèque fixée devient une dépendance directe : celles dont elle dépend se rapprochent de l'application et peuvent changer de version à leur tour. Les fixer aussi, puis comparer de nouveau.
 - Une bibliothèque Kotlin Multiplatform dont le POM racine désigne l'artefact JVM au lieu de l'artefact Android : la rediriger vers l'artefact Android par `maven.override` dans `MODULE.bazel`, comme `androidx.window:window-core`.
 
 Après un changement de version dans le catalogue, en particulier du BOM Compose, ces versions sont à vérifier de nouveau : rien ne le fait automatiquement.
