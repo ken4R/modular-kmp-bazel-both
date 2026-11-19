@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+#
+# Publishes the shared Kotlin code where the Bazel build of each application expects it:
+#   Android  one AAR per shared module, in the local Maven repository android/shared/maven.
+#   iOS      Shared.xcframework, in ios/SharedKit/Frameworks. Bazel and the Swift packages read it there.
+#
+#   tools/shared/sync              both sides, debug framework (Android only on Linux)
+#   tools/shared/sync --android    the Android libraries only
+#   tools/shared/sync --ios        the iOS framework only (macOS)
+#   tools/shared/sync --release    release framework
+#
+# Run it after every change under shared/. Gradle skips the work that is already done.
+
+set -euo pipefail
+
+usage="usage: tools/shared/sync [--android] [--ios] [--debug | --release]"
+android=false
+ios=false
+configuration="Debug"
+for argument in "$@"; do
+  case "$argument" in
+    --android) android=true ;;
+    --ios) ios=true ;;
+    --debug) configuration="Debug" ;;
+    --release) configuration="Release" ;;
+    *)
+      echo "$usage" >&2
+      exit 64
+      ;;
+  esac
+done
+
+on_macos=false
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  on_macos=true
+fi
+
+# Without a side, publish everything this machine can build.
+if ! $android && ! $ios; then
+  android=true
+  if $on_macos; then
+    ios=true
+  else
+    echo "The iOS framework needs macOS: only the Android libraries are published." >&2
+  fi
+fi
+
+if $ios && ! $on_macos; then
+  echo "tools/shared/sync --ios needs macOS: Kotlin/Native builds the iOS framework with Xcode." >&2
+  exit 1
+fi
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+maven_repository="$root/android/shared/maven"
+variant="$(printf '%s' "$configuration" | tr '[:upper:]' '[:lower:]')"
+built_framework="$root/shared/umbrella/build/XCFrameworks/$variant/Shared.xcframework"
+framework="$root/ios/SharedKit/Frameworks/Shared.xcframework"
+
+tasks=()
+if $android; then
+  # The repository holds the libraries of this build only: no stale module survives in it.
+  rm -rf "$maven_repository"
+  tasks+=("publishAndroidForBazel")
+fi
+if $ios; then
+  tasks+=(":shared:umbrella:assembleShared${configuration}XCFramework")
+fi
+
+"$root/gradlew" --project-dir "$root" "${tasks[@]}"
+
+if $android; then
+  libraries="$(find "$maven_repository" -name '*.aar' 2>/dev/null | wc -l | tr -d ' ')"
+  if [[ "$libraries" == "0" ]]; then
+    echo "Gradle published no Android library to android/shared/maven." >&2
+    exit 1
+  fi
+  echo "$libraries Android libraries are in android/shared/maven."
+fi
+
+if $ios; then
+  rm -rf "$framework"
+  mkdir -p "$(dirname "$framework")"
+  cp -R "$built_framework" "$framework"
+  echo "Shared.xcframework ($variant) is in ios/SharedKit/Frameworks."
+fi

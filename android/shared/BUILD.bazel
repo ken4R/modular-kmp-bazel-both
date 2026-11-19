@@ -1,0 +1,26 @@
+load("//android:shared_aar.bzl", "shared_aar")
+
+# The shared Kotlin code, seen from Android: one AAR per Gradle module of shared/.
+# tools/shared/sync --android publishes them in android/shared/maven, never committed.
+# shared_aar adds what the convention plugins add. `deps` repeats each module's build.gradle.kts.
+
+shared_aar(
+    name = "core_session",
+    module = "core/session",
+)
+
+shared_aar(
+    name = "feature_login",
+    module = "feature/login",
+    deps = [":core_session"],
+)
+
+shared_aar(
+    name = "umbrella",
+    module = "umbrella",
+    deps = [
+        ":core_session",
+        ":feature_login",
+        "@maven//:androidx_lifecycle_lifecycle_viewmodel_android",
+    ],
+)

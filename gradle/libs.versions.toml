@@ -1,0 +1,128 @@
+# Single source of truth for versions, read by both builds:
+# - Gradle builds the shared Kotlin code: build-logic and shared/ use [versions], [libraries] and [plugins].
+# - Bazel builds the applications: MODULE.bazel imports every entry of [libraries] into @maven,
+#   and //android:catalog.bzl reads the Android SDK levels and the Robolectric runtime below.
+#   [plugins] are Gradle plugins only: Bazel does not resolve them.
+#
+# Kotlin, SKIE, AGP and Gradle move together: check the Kotlin Multiplatform compatibility guide
+# before changing any of them. rules_kotlin in MODULE.bazel follows the same Kotlin version.
+# https://kotlinlang.org/docs/multiplatform/multiplatform-compatibility-guide.html
+#
+# After any change to [libraries], lock the Bazel dependencies again: REPIN=1 bazel run @maven//:pin
+
+[versions]
+# Toolchain
+kotlin = "2.4.21"
+agp = "9.3.1"
+skie = "0.10.16"
+
+# Android SDK levels. minSdk is a prototype default: the real value is an open decision.
+# compileSdk follows the AndroidX libraries: Compose 1.12 and Lifecycle 2.11 require 37.
+# targetSdk changes runtime behavior, so it moves on its own, and Robolectric must support it.
+android-compileSdk = "37"
+android-targetSdk = "36"
+android-minSdk = "26"
+
+# Libraries
+kotlinx-coroutines = "1.11.0"
+androidx-lifecycle = "2.11.0"
+androidx-activity = "1.13.0"
+androidx-compose-bom = "2026.09.00"
+# Bazel only: AndroidX groups pinned at the end of [libraries].
+androidx-annotation = "1.9.1"
+androidx-collection = "1.5.0"
+androidx-core = "1.18.0"
+androidx-savedstate = "1.4.0"
+
+# Tests
+junit = "4.13.2"
+robolectric = "4.18"
+androidx-test-ext-junit = "1.3.0"
+# Android runtime of Robolectric for android-targetSdk. Bazel tests run Robolectric offline, so the
+# runtime is a pinned dependency instead of a download at test time. Robolectric 4.18 names it in
+# org.robolectric.plugins.DefaultSdkProvider.
+robolectric-android-all = "16-robolectric-13921718-2-i7"
+
+[libraries]
+# Shared code
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+androidx-lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel", version.ref = "androidx-lifecycle" }
+
+# Android runtime, as Gradle adds it to the shared code: the Kotlin library of the compiler,
+# and the main dispatcher of coroutines.
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
+
+# Android UI. Compose versions come from the BOM.
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "androidx-compose-bom" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+
+# Compiler plugin of Compose, for Bazel. Gradle applies the same compiler through its own plugin.
+kotlin-compose-compiler-plugin-embeddable = { module = "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable", version.ref = "kotlin" }
+
+# Bazel only. The Maven resolution of Bazel reads POM files, where Gradle reads Gradle module
+# metadata, and the two do not choose the same versions:
+# - Gradle aligns the libraries of an AndroidX group on one version. In a POM, a library requires the
+#   exact version of its siblings: two libraries of the same group at different versions make Bazel fail.
+# - When two libraries ask for different versions of a third, Gradle takes the highest, Maven the one
+#   nearest to the application: Bazel would silently give a library an older version than it expects.
+#   A library listed here becomes a direct dependency, which brings the libraries it depends on nearer
+#   too: they are listed as well.
+# Bazel prefers the versions of [libraries]: each library below is pinned at the version that Gradle
+# selects for the same dependencies. Check them again after a change of a version above.
+androidx-activity = { module = "androidx.activity:activity", version.ref = "androidx-activity" }
+androidx-activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "androidx-activity" }
+androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "androidx-annotation" }
+androidx-annotation-experimental = { module = "androidx.annotation:annotation-experimental", version = "1.4.1" }
+androidx-annotation-jvm = { module = "androidx.annotation:annotation-jvm", version.ref = "androidx-annotation" }
+androidx-collection = { module = "androidx.collection:collection", version.ref = "androidx-collection" }
+androidx-collection-jvm = { module = "androidx.collection:collection-jvm", version.ref = "androidx-collection" }
+androidx-collection-ktx = { module = "androidx.collection:collection-ktx", version.ref = "androidx-collection" }
+androidx-concurrent-futures = { module = "androidx.concurrent:concurrent-futures", version = "1.2.0" }
+androidx-core = { module = "androidx.core:core", version.ref = "androidx-core" }
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
+androidx-core-viewtree = { module = "androidx.core:core-viewtree", version = "1.0.0" }
+androidx-emoji2 = { module = "androidx.emoji2:emoji2", version = "1.4.0" }
+androidx-interpolator = { module = "androidx.interpolator:interpolator", version = "1.0.0" }
+androidx-lifecycle-common = { module = "androidx.lifecycle:lifecycle-common", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-common-java8 = { module = "androidx.lifecycle:lifecycle-common-java8", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-viewmodel-savedstate = { module = "androidx.lifecycle:lifecycle-viewmodel-savedstate", version.ref = "androidx-lifecycle" }
+androidx-savedstate = { module = "androidx.savedstate:savedstate", version.ref = "androidx-savedstate" }
+androidx-savedstate-compose = { module = "androidx.savedstate:savedstate-compose", version.ref = "androidx-savedstate" }
+androidx-savedstate-ktx = { module = "androidx.savedstate:savedstate-ktx", version.ref = "androidx-savedstate" }
+androidx-startup-runtime = { module = "androidx.startup:startup-runtime", version = "1.1.1" }
+androidx-tracing = { module = "androidx.tracing:tracing", version = "1.2.0" }
+androidx-versionedparcelable = { module = "androidx.versionedparcelable:versionedparcelable", version = "1.1.1" }
+# The Android artifact of window-core, which MODULE.bazel puts in place of its root artifact.
+androidx-window-core-android = { module = "androidx.window:window-core-android", version = "1.5.0" }
+androidx-test-services-storage = { module = "androidx.test.services:storage", version = "1.6.0" }
+# Robolectric only.
+guava = { module = "com.google.guava:guava", version = "33.7.2-jre" }
+
+# ListenableFuture of the AndroidX libraries. Without it, Maven resolution picks Guava's empty
+# placeholder and the application crashes at startup in profileinstaller.
+guava-listenablefuture = { module = "com.google.guava:listenablefuture", version = "1.0" }
+
+# Android tests
+junit = { module = "junit:junit", version.ref = "junit" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+robolectric-android-all = { module = "org.robolectric:android-all-instrumented", version.ref = "robolectric-android-all" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext-junit" }
+
+[plugins]
+# Applied by build-logic only: build-logic/build.gradle.kts puts them on its classpath.
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+skie = { id = "co.touchlab.skie", version.ref = "skie" }

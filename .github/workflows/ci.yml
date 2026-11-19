@@ -1,0 +1,202 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Shared code (Gradle) and Android (Bazel)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # Temporary, until maven_install.json is committed: the job commits the lock file it writes.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The branch itself rather than the merge commit, so that the lock file can be pushed to it.
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - uses: bazel-contrib/setup-bazel@0.19.2
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-android
+          repository-cache: true
+
+      - name: Test the build logic and the module rules
+        run: ./gradlew -p build-logic test
+
+      # check: shared tests on the JVM, module rules.
+      - name: Check the shared code
+        run: ./gradlew check
+
+      - name: Publish the shared code for Bazel
+        run: tools/shared/sync --android
+
+      # Temporary, until maven_install.json is committed: lock the Maven dependencies of Bazel,
+      # and commit the lock file to the branch of the pull request.
+      - name: Lock the Maven dependencies of Bazel
+        if: github.event_name == 'pull_request'
+        run: |
+          REPIN=1 bazel run @maven//:pin
+          if ! git diff --quiet -- maven_install.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add maven_install.json
+            git commit -m "Verrouille les dépendances Maven de Bazel"
+            git push origin "HEAD:refs/heads/${GITHUB_HEAD_REF}"
+          fi
+
+      # The Android SDK of the runner has the platform and the build tools of compileSdk 37.
+      - name: Build the Android application with Bazel
+        run: bazel build //android/app
+
+      # Robolectric screen tests, and every other Android target.
+      - name: Test Android with Bazel
+        run: bazel test //android/...
+
+      - name: Keep the debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: modular-debug-apk
+          path: bazel-bin/android/app/app.apk
+          if-no-files-found: error
+
+      # Temporary probe: the versions Gradle selects for the Android dependencies of the catalog,
+      # with Gradle module metadata, to compare with the Maven resolution of Bazel. Last, so that
+      # its output ends the log.
+      - name: Resolve the Android dependencies with Gradle (temporary probe)
+        if: always()
+        continue-on-error: true
+        run: |
+          probe="$RUNNER_TEMP/android-probe"
+          mkdir -p "$probe"
+          echo "android.useAndroidX=true" > "$probe/gradle.properties"
+          cat > "$probe/settings.gradle.kts" <<EOF
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement {
+              repositories { google(); mavenCentral() }
+              versionCatalogs { create("libs") { from(files("$GITHUB_WORKSPACE/gradle/libs.versions.toml")) } }
+          }
+          rootProject.name = "android-probe"
+          EOF
+          cat > "$probe/build.gradle.kts" <<'EOF'
+          import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+
+          plugins { id("com.android.library") version "9.3.1" }
+
+          android {
+              namespace = "com.example.probe"
+              compileSdk = 37
+              defaultConfig { minSdk = 26 }
+          }
+
+          val catalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
+          fun library(alias: String) = catalog.findLibrary(alias).get()
+
+          dependencies {
+              implementation(platform(library("androidx-compose-bom")))
+              listOf(
+                  "kotlin-stdlib", "kotlinx-coroutines-core", "kotlinx-coroutines-android",
+                  "androidx-lifecycle-viewmodel", "androidx-lifecycle-runtime-compose",
+                  "androidx-lifecycle-viewmodel-compose", "androidx-activity-compose",
+                  "androidx-compose-ui", "androidx-compose-ui-tooling-preview", "androidx-compose-material3",
+                  "guava-listenablefuture",
+              ).forEach { implementation(library(it)) }
+              listOf(
+                  "androidx-compose-ui-test-junit4", "androidx-compose-ui-test-manifest",
+                  "androidx-test-ext-junit", "junit", "robolectric",
+              ).forEach { testImplementation(library(it)) }
+          }
+
+          tasks.register("printResolved") {
+              val result = configurations.named("debugUnitTestRuntimeClasspath").map { it.incoming.resolutionResult }
+              doLast {
+                  result.get().allComponents
+                      .mapNotNull { it.id as? ModuleComponentIdentifier }
+                      .map { "${it.group}:${it.module}:${it.version}" }
+                      .sorted()
+                      .forEach { println("resolved $it") }
+              }
+          }
+          EOF
+          ./gradlew -p "$probe" --quiet --no-configuration-cache printResolved
+
+  ios:
+    name: iOS (Gradle framework, Bazel, Swift packages)
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      # The Xcode version Kotlin is tested with. Gradle, Bazel and xcodebuild all read this variable.
+      DEVELOPER_DIR: /Applications/Xcode_26.4.app/Contents/Developer
+      IOS_SIMULATOR: iPhone 17
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Cache the Kotlin/Native toolchain
+        uses: actions/cache@v6
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('gradle/libs.versions.toml') }}
+
+      - uses: bazel-contrib/setup-bazel@0.19.2
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-ios
+          repository-cache: true
+
+      - name: Test the shared code on an iOS simulator
+        run: ./gradlew iosSimulatorArm64Test
+
+      - name: Build Shared.xcframework
+        run: tools/shared/sync --ios
+
+      # The Bazel test runner reuses one simulator, named after its device type and iOS version,
+      # and creates it with this same tool when it is missing. Its first boot takes minutes on a
+      # new runner, more than a test timeout: it happens here, before the tests.
+      - name: Boot the simulator of the iOS tests
+        run: |
+          id="$(bazel run @rules_apple//apple/testing/default_runner:simulator_creator -- \
+            --device-type "$IOS_SIMULATOR" \
+            --sdk-version "$(xcrun --sdk iphonesimulator --show-sdk-version)")"
+          echo "IOS_SIMULATOR_ID=${id:?the simulator creator printed no id}" >> "$GITHUB_ENV"
+
+      # Builds every iOS target, the application included, runs the unit tests and checks
+      # that the generated Package.swift files are current.
+      - name: Build and test iOS with Bazel
+        run: bazel test //ios/... --@rules_apple//apple/build_settings:ios_simulator_device="$IOS_SIMULATOR"
+
+      - name: Generate the Xcode project
+        run: bazel run //ios:xcodeproj
+
+      # The same modules, built as Swift packages the way Xcode does.
+      - name: Build and test the Login module as a Swift package
+        working-directory: ios/Features/Login
+        run: xcodebuild test -scheme Login -destination "id=$IOS_SIMULATOR_ID"

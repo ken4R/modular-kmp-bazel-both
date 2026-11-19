@@ -1,0 +1,6 @@
+load("//android:android_module.bzl", "android_module")
+
+# Compose components shared by every screen: theme, buttons.
+android_module(
+    name = "designsystem",
+)
