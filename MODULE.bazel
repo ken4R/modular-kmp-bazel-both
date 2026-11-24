@@ -1,0 +1,81 @@
+"""Bazel builds both applications and their modules. Gradle builds the shared Kotlin code only."""
+
+module(name = "modular_kmp_bazel_both")
+
+# --- iOS: the same rules as prototype A ---------------------------------------------------------
+
+# apple_support comes first: its C++ toolchain must be registered before the one of rules_cc.
+bazel_dep(name = "apple_support", version = "2.12.0")
+bazel_dep(name = "rules_apple", version = "5.4.0")
+bazel_dep(name = "rules_swift", version = "4.3.0")
+
+# Constraint values, such as @platforms//os:ios.
+bazel_dep(name = "platforms", version = "1.0.0")
+
+# Writes the generated Package.swift files back to the source tree and tests that they are current.
+bazel_dep(name = "bazel_lib", version = "3.8.0")
+
+# Generates the Xcode project: bazel run //ios:xcodeproj
+bazel_dep(name = "rules_xcodeproj", version = "4.1.0")
+
+# --- Android --------------------------------------------------------------------------------------
+
+# Android rules in Starlark. The SDK comes from ANDROID_HOME: rules_android declares @androidsdk
+# itself and compiles against the newest platform of the SDK.
+bazel_dep(name = "rules_android", version = "0.8.1")
+
+# Kotlin compiler and kt_android_library. Its Kotlin version follows `kotlin` in the catalog.
+bazel_dep(name = "rules_kotlin", version = "2.4.21")
+
+register_toolchains("//android:kotlin_toolchain")
+
+# Maven dependencies of the applications.
+bazel_dep(name = "rules_jvm_external", version = "7.2")
+
+# Reads the catalog in //android:catalog.bzl.
+bazel_dep(name = "toml.bzl", version = "0.3.0")
+
+# Only to name its build setting in .bazelrc: the released protoc instead of a build from C++.
+bazel_dep(name = "protobuf", version = "33.4")
+
+# The Maven dependencies come from the version catalog that Gradle uses: one list of versions for
+# both builds. They are locked in maven_install.json, which `REPIN=1 bazel run @maven//:pin`
+# writes again after a change to the catalog. Bazel refuses a stale lock file.
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+maven.install(
+    name = "maven",
+    aar_import_bzl_label = "@rules_android//rules:rules.bzl",
+    fetch_sources = True,
+    lock_file = "//:maven_install.json",
+    repositories = [
+        "https://maven.google.com",
+        "https://repo1.maven.org/maven2",
+    ],
+    # The Maven resolver understands BOMs, which the Compose libraries use.
+    resolver = "maven",
+    use_starlark_android_rules = True,
+)
+maven.from_toml(
+    name = "maven",
+    bom_modules = ["androidx.compose:compose-bom"],
+    libs_versions_toml = "//gradle:libs.versions.toml",
+)
+
+# The root artifact of a Kotlin Multiplatform library names a single platform in its POM, which Bazel
+# reads, and every platform in its Gradle module metadata, which Gradle reads. The POMs of these two
+# name their JVM artifact where Gradle takes the Android one: the application would get JVM classes,
+# twice for runtime-annotation, whose Android artifact comes through another library. Both are
+# replaced by their Android artifact.
+maven.override(
+    coordinates = "androidx.compose.runtime:runtime-annotation",
+    target = "@maven//:androidx_compose_runtime_runtime_annotation_android",
+)
+maven.override(
+    coordinates = "androidx.window:window-core",
+    target = "@maven//:androidx_window_window_core_android",
+)
+use_repo(maven, "maven")
+
+# Android SDK levels and the Robolectric runtime, read from the same catalog.
+android_catalog = use_extension("//android:catalog.bzl", "android_catalog")
+use_repo(android_catalog, "android_catalog")

@@ -1,0 +1,15 @@
+load("//android:android_module.bzl", "android_application")
+
+# The application assembles the features and owns navigation. It is the only target that may
+# depend on a feature and on the umbrella of the shared code.
+android_application(
+    name = "app",
+    application_id = "com.example.modular",
+    version_code = "1",
+    version_name = "0.1.0",
+    deps = [
+        "//android/core/designsystem",
+        "//android/feature/login",
+        "//android/shared:umbrella",
+    ],
+)

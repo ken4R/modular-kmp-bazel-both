@@ -1,0 +1,28 @@
+# Gradle and Kotlin
+.gradle/
+.kotlin/
+build/
+local.properties
+
+# Bazel
+/bazel-*
+.bazelrc.user
+
+# Shared code published for Bazel by tools/shared/sync, never committed
+/android/shared/maven/
+/ios/SharedKit/Frameworks/
+
+# Xcode and SwiftPM
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+.swiftpm/
+.build/
+Package.resolved
+
+# Editors and system
+.idea/
+*.iml
+.vscode/
+.DS_Store

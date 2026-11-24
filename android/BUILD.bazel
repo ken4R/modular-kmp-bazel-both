@@ -1,0 +1,29 @@
+load("@android_catalog//:catalog.bzl", "ROBOLECTRIC_ANDROID_ALL")
+load("@rules_kotlin//kotlin:core.bzl", "define_kt_toolchain", "kt_compiler_plugin")
+load(":robolectric.bzl", "robolectric_runtime")
+
+# Kotlin compiler of the Android modules, registered in MODULE.bazel. rules_kotlin bundles the
+# compiler of the `kotlin` version of the catalog. Bytecode for Java 17, like the shared code.
+define_kt_toolchain(
+    name = "kotlin_toolchain",
+    jvm_target = "17",
+)
+
+# The Compose compiler, which android_module.bzl applies to every module and every test.
+kt_compiler_plugin(
+    name = "compose_compiler_plugin",
+    id = "androidx.compose.compiler.plugins.kotlin",
+    target_embedded_compiler = True,
+    visibility = ["//android:__subpackages__"],
+    deps = ["@maven//:org_jetbrains_kotlin_kotlin_compose_compiler_plugin_embeddable"],
+)
+
+# Android runtime of the Robolectric tests, for the targetSdk of the catalog.
+robolectric_runtime(
+    name = "robolectric_runtime",
+    testonly = True,
+    jar = "@maven//:org_robolectric_android_all_instrumented",
+    properties = "robolectric-deps.properties",
+    version = ROBOLECTRIC_ANDROID_ALL,
+    visibility = ["//android:__subpackages__"],
+)

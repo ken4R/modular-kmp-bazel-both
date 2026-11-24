@@ -1,0 +1,2 @@
+# Lock file of the Maven dependencies of Bazel, written by `REPIN=1 bazel run @maven//:pin`.
+exports_files(["maven_install.json"])
