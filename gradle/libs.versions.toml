@@ -30,6 +30,7 @@ androidx-activity = "1.13.0"
 androidx-compose-bom = "2026.09.00"
 # Bazel only: AndroidX groups pinned at the end of [libraries].
 androidx-annotation = "1.9.1"
+androidx-arch-core = "2.2.0"
 androidx-collection = "1.5.0"
 androidx-core = "1.18.0"
 androidx-savedstate = "1.4.0"
@@ -83,6 +84,8 @@ androidx-activity-ktx = { module = "androidx.activity:activity-ktx", version.ref
 androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "androidx-annotation" }
 androidx-annotation-experimental = { module = "androidx.annotation:annotation-experimental", version = "1.4.1" }
 androidx-annotation-jvm = { module = "androidx.annotation:annotation-jvm", version.ref = "androidx-annotation" }
+androidx-arch-core-common = { module = "androidx.arch.core:core-common", version.ref = "androidx-arch-core" }
+androidx-arch-core-runtime = { module = "androidx.arch.core:core-runtime", version.ref = "androidx-arch-core" }
 androidx-collection = { module = "androidx.collection:collection", version.ref = "androidx-collection" }
 androidx-collection-jvm = { module = "androidx.collection:collection-jvm", version.ref = "androidx-collection" }
 androidx-collection-ktx = { module = "androidx.collection:collection-ktx", version.ref = "androidx-collection" }
